@@ -9,14 +9,6 @@
   <style>
     body { margin:0; padding:0; }
     #map { position:absolute; top:0; bottom:0; width:100%; }
-    .marker {
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-      border: 2px solid white;
-      background-size: cover;
-      background-position: center;
-    }
   </style>
 </head>
 <body>
@@ -44,28 +36,65 @@
 
   map.on('load', async function () {
     const rows = await fetchGoogleSheetsData();
+    
+    // Create GeoJSON data structure
+    const geojson = {
+      type: 'FeatureCollection',
+      features: rows.slice(1).map(row => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [parseFloat(row[3]), parseFloat(row[2])]
+        },
+        properties: {}
+      }))
+    };
 
-    rows.slice(1).forEach(function(row) { // Skip header row
-      const [city, country, lat, lng, imageUrl] = row;
-      const coordinates = [parseFloat(lng), parseFloat(lat)];
+    // Add the data source for the heatmap
+    map.addSource('heatmap', {
+      type: 'geojson',
+      data: geojson
+    });
 
-      // Vytvořte DOM element pro každý marker
-      var el = document.createElement('div');
-      el.className = 'marker';
-      el.style.backgroundImage = 'url(' + imageUrl + ')';
-
-      // Vytvořte marker a přidejte do mapy
-      new mapboxgl.Marker(el)
-        .setLngLat(coordinates)
-        .addTo(map);
-
-      // Přidání vyskakovacího okna s popisem
-      el.addEventListener('click', function() {
-        new mapboxgl.Popup()
-          .setLngLat(coordinates)
-          .setHTML(`<strong>${city}, ${country}</strong>`)
-          .addTo(map);
-      });
+    // Add the heatmap layer
+    map.addLayer({
+      id: 'heatmap-layer',
+      type: 'heatmap',
+      source: 'heatmap',
+      maxzoom: 15,
+      paint: {
+        'heatmap-weight': 1,
+        'heatmap-intensity': {
+          stops: [
+            [0, 1],
+            [15, 3]
+          ]
+        },
+        'heatmap-color': [
+          'interpolate',
+          ['linear'],
+          ['heatmap-density'],
+          0, 'rgba(33,102,172,0)',
+          0.2, 'rgb(103,169,207)',
+          0.4, 'rgb(209,229,240)',
+          0.6, 'rgb(253,219,199)',
+          0.8, 'rgb(239,138,98)',
+          1, 'rgb(178,24,43)'
+        ],
+        'heatmap-radius': {
+          stops: [
+            [0, 2],
+            [15, 20]
+          ]
+        },
+        'heatmap-opacity': {
+          default: 1,
+          stops: [
+            [14, 1],
+            [15, 0]
+          ]
+        }
+      }
     });
   });
 </script>
